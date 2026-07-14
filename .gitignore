@@ -1,0 +1,17 @@
+# 忽略输出文件夹
+output/
+# 忽略视频文件
+video/
+# 忽略 Python 缓存文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+# 忽略虚拟环境
+venv/
+.venv/
+# 忽略日志、临时文件
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

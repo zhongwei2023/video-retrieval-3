@@ -1,0 +1,19 @@
+﻿llm:
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-chat"
+  timeout: 60
+video:
+  fps: null
+  sampling_mode: "high_density"
+  max_side: 1024
+localizer:
+  model_id: "google/owlv2-base-patch16-ensemble"
+  box_threshold: 0.25
+  text_threshold: 0.25
+  batch_size: 1
+scorer:
+  w_confidence: 0.5
+  w_area: 0.3
+  w_sharpness: 0.2
+output:
+  crop_padding_ratio: 0.08
