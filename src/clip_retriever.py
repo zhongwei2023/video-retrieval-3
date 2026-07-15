@@ -25,19 +25,19 @@ class CLIPRetriever:
         tokens = clip.tokenize([query]).to(self.device)
         vec = self.model.encode_text(tokens)
         vec = vec / vec.norm(dim=-1, keepdim=True)
-        return vec.cpu().numpy().astype(np.float32)
+        return vec.float().cpu().numpy().astype(np.float32)
 
     @torch.no_grad()
     def score_frames(
         self, rgbs: List[np.ndarray], text_vec: np.ndarray, batch_size: int = 32
     ) -> List[float]:
-        text_tensor = torch.from_numpy(text_vec).to(self.device)
+        text_tensor = torch.from_numpy(text_vec).float().to(self.device)
         scores: List[float] = []
         for i in range(0, len(rgbs), batch_size):
             batch_rgbs = rgbs[i : i + batch_size]
             pil_images = [Image.fromarray(rgb) for rgb in batch_rgbs]
             image_tensors = torch.stack([self.preprocess(img) for img in pil_images]).to(self.device)
-            image_vecs = self.model.encode_image(image_tensors)
+            image_vecs = self.model.encode_image(image_tensors).float()
             image_vecs = image_vecs / image_vecs.norm(dim=-1, keepdim=True)
             batch_scores = (image_vecs @ text_tensor.T).squeeze(-1)
             scores.extend(batch_scores.cpu().tolist())
