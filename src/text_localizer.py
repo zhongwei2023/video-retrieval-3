@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List, Optional
@@ -49,6 +49,8 @@ class OwlV2Localizer:
             images=pil_images,
             return_tensors="pt",
             padding=True,
+            max_length=77,
+            truncation=True,
         )
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
         outputs = self.model(**inputs)

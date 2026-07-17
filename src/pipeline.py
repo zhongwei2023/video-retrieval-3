@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import time
@@ -43,7 +43,7 @@ class PipelineConfig:
 
 def _run_owlv2_stage(
     candidate_frames: List[FrameSample],
-    query_for_det: str,
+    detect_query: str,
     box_threshold: float,
     text_threshold: float,
     owl_batch_size: int,
@@ -59,7 +59,7 @@ def _run_owlv2_stage(
         batch = candidate_frames[bi : bi + bs]
         batch_rgbs = [f.rgb for f in batch]
         try:
-            batch_dets = localizer.detect_batch(batch_rgbs, query_for_det)
+            batch_dets = localizer.detect_batch(batch_rgbs, detect_query)
         except RuntimeError as e:
             if "out of memory" in str(e).lower():
                 print(f"  [{_ts()}] OOM, falling back to single-frame")
@@ -67,7 +67,7 @@ def _run_owlv2_stage(
                 batch_dets = []
                 for f in batch:
                     try:
-                        dets = localizer.detect(f.rgb, query_for_det)
+                        dets = localizer.detect(f.rgb, detect_query)
                         batch_dets.append(dets)
                     except RuntimeError:
                         batch_dets.append([])
@@ -115,10 +115,10 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
         model=cfg.llm_model,
         api_key=cfg.llm_api_key,
     )
-    query_for_det = spec.english_query or spec.target_object or cfg.query
-    print(f"[{_ts()}] target_object : {spec.target_object}")
-    print(f"[{_ts()}] english_query : {spec.english_query}")
-    print(f"  -> detection query: {query_for_det!r}  ({time.time()-t0:.1f}s)")
+    clip_query = spec.clip_query
+    detect_query = spec.detect_query
+    print(f"  -> CLIP query:    {clip_query!r}")
+    print(f"  -> OWLv2 query:   {detect_query!r}  ({time.time()-t0:.1f}s)")
 
     # ── Stage 2: Sampling ───────────────────────────────────────
     print(f"\n[{_ts()}] [2/5] Sampling video frames ...")
@@ -139,7 +139,7 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     t0 = time.time()
     rgbs_all = [f.rgb for f in frames]
     clip_model = CLIPRetriever(model_name="ViT-B/32")
-    text_vec = clip_model.encode_text(query_for_det)
+    text_vec = clip_model.encode_text(clip_query)
     clip_scores = clip_model.score_frames(rgbs_all, text_vec, batch_size=cfg.clip_batch_size)
 
     scored = sorted(zip(frames, clip_scores), key=lambda x: x[1], reverse=True)
@@ -159,7 +159,7 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     for thresh in thresholds_to_try:
         print(f"\n[{_ts()}] [4/5] OWLv2 grounding (threshold={thresh}) ...")
         candidates, owl_elapsed = _run_owlv2_stage(
-            candidate_frames, query_for_det,
+            candidate_frames, detect_query,
             box_threshold=thresh,
             text_threshold=cfg.text_threshold,
             owl_batch_size=cfg.owl_batch_size,
@@ -173,14 +173,15 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
         elapsed = time.time() - start
         print(f"\n[{_ts()}] [5/5] No target detected after all thresholds")
         print(f"  CLIP top scores: {top_scores[:10]}")
-        print(f"  detection query used: {query_for_det!r}")
+        print(f"  CLIP query:    {clip_query!r}")
+        print(f"  OWLv2 query:   {detect_query!r}")
         print(f"  Tried thresholds: {thresholds_to_try}")
         print(f"  === EXIT (no result) === ({elapsed:.1f}s)")
         return {
             "video": cfg.video_path,
             "query": cfg.query,
-            "target_object": spec.target_object,
-            "english_query": query_for_det,
+            "clip_query": clip_query,
+            "detect_query": detect_query,
             "error": "no_detection",
             "clip_top_scores": top_scores,
             "tried_thresholds": thresholds_to_try,
@@ -197,8 +198,9 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     meta = {
         "video": cfg.video_path,
         "query": cfg.query,
-        "target_object": spec.target_object,
-        "english_query": query_for_det,
+        "clip_query": clip_query,
+        "detect_query": detect_query,
+        "crop_prompt": spec.crop_prompt,
         "best_timestamp_sec": best["timestamp_sec"],
         "bbox": best["bbox"],
         "confidence": best["confidence"],
@@ -220,10 +222,11 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     paths = save_outputs(out_dir, best_frame.rgb, crop_rgb, meta)
 
     print(f"\n[{_ts()}] ===== DONE ({elapsed:.1f}s) =====")
-    print(f"  target     : {spec.target_object}")
-    print(f"  timestamp  : {meta['best_timestamp_sec']:.2f}s")
-    print(f"  confidence : {meta['confidence']:.3f}")
-    print(f"  quality    : {meta['quality_score']:.3f}")
-    print(f"  crop       : {paths['target_crop']}")
-    print(f"  meta       : {paths['meta_json']}")
+    print(f"  detect_query : {detect_query}")
+    print(f"  clip_query   : {clip_query}")
+    print(f"  timestamp    : {meta['best_timestamp_sec']:.2f}s")
+    print(f"  confidence   : {meta['confidence']:.3f}")
+    print(f"  quality      : {meta['quality_score']:.3f}")
+    print(f"  crop         : {paths['target_crop']}")
+    print(f"  meta         : {paths['meta_json']}")
     return meta

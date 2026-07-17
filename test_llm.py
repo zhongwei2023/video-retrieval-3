@@ -1,4 +1,4 @@
-﻿"""Quick test for LLM target extraction. Run with:
+"""Quick test for LLM target extraction. Run with:
     python test_llm.py --api_key YOUR_KEY
 """
 import sys
@@ -20,4 +20,4 @@ for q in queries:
         q,
         api_key=api_key,
     )
-    print(f"\nFINAL: target={result.target_object!r}  query={result.english_query!r}")
+    print(f"\nFINAL: detect_query={result.detect_query!r}  clip_query={result.clip_query!r}  crop_prompt={result.crop_prompt!r}")
