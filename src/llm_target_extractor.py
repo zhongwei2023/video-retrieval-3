@@ -25,15 +25,19 @@ SYSTEM_PROMPT = r"""你是一个专业的视频分析助手。你的任务是理
 }
 
 ## detect_query (给OWLv2目标检测模型)
-目的：精确定位目标的边界框。
-规则：只写"是什么物体"，加必要的颜色/类型限定词区分歧义。不要介词短语、场景描述、动作。2-4个英文词。
+目的：精确描述要检测的物体，使模型能把目标和画面中其他同类物体区分开。
+规则：
+- 描述目标物体，如果画面中可能有多个同类物体，必须包含区分性特征（颜色、位置等）
+- 自然英文表达，可以包含介词短语和简单的位置关系，但所有表达不能杜撰
+- 核心测试：如果画面有2个对象（比如小孩或物品），这个查询能不能“挑出”正确的那一个？
 
 用户问题 → detect_query:
-  "桌上的鼠标是什么颜色" → "computer mouse"
-  "红车的logo是什么牌子" → "red car"
-  "穿荧光黄衣服的小孩的鞋子" → "child shoes"
-  "远处那只白色的猫" → "white cat"
-  "冰箱里的牛奶" → "milk bottle"
+  “桌上的鼠标是什么颜色” → “computer mouse”
+  “红车的logo是什么牌子” → “red car”
+  “穿荧光黄衣服的小孩的鞋子” → “shoes of child in fluorescent yellow clothes”
+  “远处那只白色的猫” → “white cat”
+  “冰箱里的牛奶” → “milk inside refrigerator”
+  “戴眼镜的男生手里的书” → “book held by boy with glasses”
 
 ## clip_query (给CLIP图文匹配模型)
 目的：从大量视频帧中快速筛选出包含目标的画面。
