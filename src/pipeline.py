@@ -96,7 +96,27 @@ def _run_owlv2_stage(
     return candidates, elapsed
 
 
+
+
+def _print_timing(timing: dict, total_frames: int):
+    print("")
+    print(f"  {'='*55}")
+    print(f"  Timing Summary")
+    print(f"  {'='*55}")
+    print(f"  Stage 1 (LLM parsing)  : {timing.get('1_llm', 0):>8.2f}s")
+    print(f"  Stage 2 (Sampling)    : {timing.get('2_sampling', 0):>8.2f}s  ({total_frames} frames)")
+    print(f"  Stage 3 (CLIP)        : {timing.get('3_clip', 0):>8.2f}s")
+    print(f"    - model load        : {timing.get('3a_model_load', 0):>8.3f}s")
+    print(f"    - text encode       : {timing.get('3b_text_encode', 0):>8.3f}s")
+    print(f"    - score frames      : {timing.get('3c_score_frames', 0):>8.3f}s")
+    print(f"  Stage 4 (OWLv2)       : {timing.get('4_owlv2', 0):>8.2f}s")
+    print(f"  Stage 5 (Crop+Save)   : {timing.get('5_output', 0):>8.2f}s")
+    print(f"  {'-'*55}")
+    print(f"  TOTAL                 : {timing.get('total', 0):>8.2f}s")
+    print(f"  {'='*55}")
+
 def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
+    timing = {}
     start = time.time()
     out_root = Path(cfg.out_dir)
     out_root.mkdir(parents=True, exist_ok=True)
@@ -106,9 +126,9 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     print(f"  query: {cfg.query}")
     print(f"  fps={cfg.fps}, clip_topk={cfg.clip_topk}, max_side={cfg.max_side}")
 
-    # ── Stage 1: LLM ────────────────────────────────────────────
+    # Stage 1: LLM
     print(f"\n[{_ts()}] [1/5] LLM target extraction ...")
-    t0 = time.time()
+    t1 = time.time()
     spec = parse_target_with_llm(
         cfg.query,
         base_url=cfg.llm_base_url,
@@ -117,41 +137,60 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     )
     clip_query = spec.clip_query
     detect_query = spec.detect_query
+    t_llm = round(time.time() - t1, 2)
+    timing['1_llm'] = t_llm
     print(f"  -> CLIP query:    {clip_query!r}")
-    print(f"  -> OWLv2 query:   {detect_query!r}  ({time.time()-t0:.1f}s)")
+    print(f"  -> OWLv2 query:   {detect_query!r}  ({t_llm}s)")
 
-    # ── Stage 2: Sampling ───────────────────────────────────────
+    # Stage 2: Sampling
     print(f"\n[{_ts()}] [2/5] Sampling video frames ...")
-    t0 = time.time()
+    t2 = time.time()
     frames, sample_meta = sample_frames(
         cfg.video_path,
         fps=cfg.fps,
         sampling_mode=cfg.sampling_mode,
         max_side=cfg.max_side,
     )
+    t_sampling = round(time.time() - t2, 2)
+    timing['2_sampling'] = t_sampling
     if not frames:
         print(f"[{_ts()}] [ERROR] No frames could be sampled")
         return {"error": "no_frames", "elapsed_sec": time.time() - start}
-    print(f"[{_ts()}] {len(frames)} frames sampled ({time.time()-t0:.1f}s)")
+    n_frames = len(frames)
+    print(f"[{_ts()}] {n_frames} frames sampled ({t_sampling}s)")
 
-    # ── Stage 3: CLIP ───────────────────────────────────────────
-    print(f"\n[{_ts()}] [3/5] CLIP coarse retrieval on {len(frames)} frames ...")
-    t0 = time.time()
+    # Stage 3: CLIP
+    print(f"\n[{_ts()}] [3/5] CLIP coarse retrieval on {n_frames} frames ...")
+    t3 = time.time()
     rgbs_all = [f.rgb for f in frames]
+
+    ta = time.time()
     clip_model = CLIPRetriever(model_name="ViT-B/32")
+    t3a = round(time.time() - ta, 3)
+
+    ta = time.time()
     text_vec = clip_model.encode_text(clip_query)
+    t3b = round(time.time() - ta, 3)
+
+    ta = time.time()
     clip_scores = clip_model.score_frames(rgbs_all, text_vec, batch_size=cfg.clip_batch_size)
+    t3c = round(time.time() - ta, 3)
 
     scored = sorted(zip(frames, clip_scores), key=lambda x: x[1], reverse=True)
     topk = min(cfg.clip_topk, len(frames))
     candidate_frames = [f for f, _ in scored[:topk]]
     top_scores = [round(s, 4) for _, s in scored[:topk]]
-    print(f"[{_ts()}] CLIP top-{topk} scores: {top_scores[:5]}... ({time.time()-t0:.1f}s)")
+    t_clip = round(time.time() - t3, 2)
+    timing['3_clip'] = t_clip
+    timing['3a_model_load'] = t3a
+    timing['3b_text_encode'] = t3b
+    timing['3c_score_frames'] = t3c
+    print(f"[{_ts()}] CLIP top-{topk} scores: {top_scores[:5]}... ({t_clip}s)")
     del clip_model, text_vec, rgbs_all, scored
     gc.collect()
     torch.cuda.empty_cache()
 
-    # ── Stage 4: OWLv2 with threshold retry ─────────────────────
+    # Stage 4: OWLv2 with threshold retry
     thresholds_to_try = [cfg.box_threshold, 0.15, 0.10, 0.05]
     candidates: List[Dict[str, Any]] = []
     owl_elapsed = 0.0
@@ -167,16 +206,21 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
         print(f"[{_ts()}] OWLv2: {len(candidates)} detections ({owl_elapsed:.1f}s)")
         if candidates:
             break
+    t_owlv2 = round(owl_elapsed, 2)
+    timing['4_owlv2'] = t_owlv2
 
-    # ── Stage 5: Output ─────────────────────────────────────────
+    # Stage 5: Output
     if not candidates:
-        elapsed = time.time() - start
+        timing['5_output'] = 0.0
+        t_total = round(time.time() - start, 2)
+        timing['total'] = t_total
+        _print_timing(timing, n_frames)
         print(f"\n[{_ts()}] [5/5] No target detected after all thresholds")
         print(f"  CLIP top scores: {top_scores[:10]}")
         print(f"  CLIP query:    {clip_query!r}")
         print(f"  OWLv2 query:   {detect_query!r}")
         print(f"  Tried thresholds: {thresholds_to_try}")
-        print(f"  === EXIT (no result) === ({elapsed:.1f}s)")
+        print(f"  === EXIT (no result) === ({t_total}s)")
         return {
             "video": cfg.video_path,
             "query": cfg.query,
@@ -186,15 +230,22 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
             "clip_top_scores": top_scores,
             "tried_thresholds": thresholds_to_try,
             "sampling": sample_meta,
-            "elapsed_sec": elapsed,
+            "elapsed_sec": t_total,
+            "timing": timing,
         }
 
+    t5 = time.time()
     print(f"\n[{_ts()}] [5/5] Selecting best target crop ...")
     best = max(candidates, key=lambda c: c["quality_score"])
     best_frame: FrameSample = best["frame_sample"]
     crop_rgb = crop_with_padding(best_frame.rgb, best["bbox"], cfg.crop_padding_ratio)
+    t_output = round(time.time() - t5, 2)
+    timing['5_output'] = t_output
 
-    elapsed = time.time() - start
+    t_total = round(time.time() - start, 2)
+    timing['total'] = t_total
+    _print_timing(timing, n_frames)
+
     meta = {
         "video": cfg.video_path,
         "query": cfg.query,
@@ -215,13 +266,14 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
             "localizer": "google/owlv2-base-patch16-ensemble",
             "scorer": "heuristic",
         },
-        "elapsed_sec": elapsed,
+        "elapsed_sec": t_total,
+        "timing": timing,
     }
 
     out_dir = out_root / Path(cfg.video_path).stem
     paths = save_outputs(out_dir, best_frame.rgb, crop_rgb, meta)
 
-    print(f"\n[{_ts()}] ===== DONE ({elapsed:.1f}s) =====")
+    print(f"\n[{_ts()}] ===== DONE ({t_total}s) =====")
     print(f"  detect_query : {detect_query}")
     print(f"  clip_query   : {clip_query}")
     print(f"  timestamp    : {meta['best_timestamp_sec']:.2f}s")
