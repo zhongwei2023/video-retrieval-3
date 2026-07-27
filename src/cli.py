@@ -12,15 +12,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--query", required=True, help="Natural language question")
     parser.add_argument("--out_dir", required=True, help="Output directory")
     parser.add_argument("--fps", type=float, default=None, help="Sampling fps override")
-    parser.add_argument("--sampling_mode", default="high_density", choices=["high_density", "all_frames"], help="Sampling mode if fps is not set")
+    parser.add_argument("--sampling_mode", default="high_density", choices=["high_density", "all_frames"],
+                        help="Sampling mode if fps is not set")
     parser.add_argument("--max_side", type=int, default=1024, help="Resize long side before detection")
     parser.add_argument("--llm_base_url", default=None, help="LLM base url")
     parser.add_argument("--llm_model", default=None, help="LLM model name")
     parser.add_argument("--llm_api_key", default=None, help="LLM API key")
-    parser.add_argument("--box_threshold", type=float, default=0.25, help="OWLv2 box threshold")
-    parser.add_argument("--clip_topk", type=int, default=30, help="Top-K frames from CLIP to send to OWLv2")
-    parser.add_argument("--clip_batch", type=int, default=32, help="CLIP inference batch size")
-    parser.add_argument("--owl_batch", type=int, default=1, help="OWLv2 inference batch size (1=safer for 4GB)")
+    parser.add_argument("--detector", default="owlv2", choices=["owlv2", "grounding_dino"],
+                        help="Object detector (default: owlv2)")
+    parser.add_argument("--box_threshold", type=float, default=0.25, help="Detection box threshold")
+    parser.add_argument("--det_batch", type=int, default=4, help="OWLv2 inference batch size (3090 24G: 4-8)")
+    parser.add_argument("--gdin_batch", type=int, default=4, help="Grounding DINO inference batch size")
     return parser.parse_args()
 
 
@@ -36,10 +38,10 @@ def main() -> None:
         llm_base_url=args.llm_base_url,
         llm_model=args.llm_model,
         llm_api_key=args.llm_api_key,
+        detector=args.detector,
         box_threshold=args.box_threshold,
-        clip_topk=args.clip_topk,
-        clip_batch_size=args.clip_batch,
-        owl_batch_size=args.owl_batch,
+        det_batch_size=args.det_batch,
+        gdin_batch_size=args.gdin_batch,
     )
     run_pipeline(cfg)
 

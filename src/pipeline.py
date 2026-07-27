@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import time
@@ -11,9 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .llm_target_extractor import parse_target_with_llm
 from .video_sampler import sample_frames, FrameSample
-from .clip_retriever import CLIPRetriever
-from .text_localizer import OwlV2Localizer, OWLConfig
-from .frame_scorer import score_detection, laplacian_sharpness
+from .detectors import create_detector, BaseDetector
 from .cropper import crop_with_padding, save_outputs
 from .detection import Detection
 
@@ -33,33 +31,34 @@ class PipelineConfig:
     llm_base_url: Optional[str] = None
     llm_model: Optional[str] = None
     llm_api_key: Optional[str] = None
+    detector: str = "owlv2"
     box_threshold: float = 0.25
     text_threshold: float = 0.25
     crop_padding_ratio: float = 0.08
-    clip_topk: int = 30
-    clip_batch_size: int = 32
-    owl_batch_size: int = 1
+    det_batch_size: int = 4
+    gdin_batch_size: int = 4
 
 
-def _run_owlv2_stage(
-    candidate_frames: List[FrameSample],
+def _run_detector_stage(
+    frames: List[FrameSample],
     detect_query: str,
+    detector: BaseDetector,
     box_threshold: float,
-    text_threshold: float,
-    owl_batch_size: int,
+    batch_size: int,
 ) -> Tuple[List[Dict[str, Any]], float]:
     t0 = time.time()
-    localizer = OwlV2Localizer(
-        OWLConfig(box_threshold=box_threshold, text_threshold=text_threshold)
-    )
-    candidates: List[Dict[str, Any]] = []
-    bs = max(1, owl_batch_size)
+    # Set threshold on detector
+    detector.box_threshold = box_threshold
 
-    for bi in range(0, len(candidate_frames), bs):
-        batch = candidate_frames[bi : bi + bs]
+    candidates: List[Dict[str, Any]] = []
+    bs = max(1, batch_size)
+    total = len(frames)
+
+    for bi in range(0, total, bs):
+        batch = frames[bi : bi + bs]
         batch_rgbs = [f.rgb for f in batch]
         try:
-            batch_dets = localizer.detect_batch(batch_rgbs, detect_query)
+            batch_dets = detector.detect_batch(batch_rgbs, detect_query)
         except RuntimeError as e:
             if "out of memory" in str(e).lower():
                 print(f"  [{_ts()}] OOM, falling back to single-frame")
@@ -67,7 +66,7 @@ def _run_owlv2_stage(
                 batch_dets = []
                 for f in batch:
                     try:
-                        dets = localizer.detect(f.rgb, detect_query)
+                        dets = detector.detect(f.rgb, detect_query)
                         batch_dets.append(dets)
                     except RuntimeError:
                         batch_dets.append([])
@@ -76,44 +75,37 @@ def _run_owlv2_stage(
 
         for frame, dets in zip(batch, batch_dets):
             for d in dets:
-                q = score_detection(d, frame.rgb)
                 candidates.append({
                     "frame_index": frame.index,
                     "timestamp_sec": frame.timestamp_sec,
                     "bbox": d.bbox,
                     "confidence": d.score,
-                    "quality_score": q,
-                    "sharpness": laplacian_sharpness(frame.rgb),
+                    "quality_score": d.score,
                     "frame_sample": frame,
                 })
-        pct = min(100, int(100 * (bi + len(batch)) / len(candidate_frames)))
+        pct = min(100, int(100 * (bi + len(batch)) / total))
         print(f"  [{_ts()}] {pct:3d}% | detections={len(candidates)}")
 
     elapsed = time.time() - t0
-    del localizer
-    gc.collect()
-    torch.cuda.empty_cache()
     return candidates, elapsed
 
 
-
-
-def _print_timing(timing: dict, total_frames: int):
+def _print_timing(timing: dict, total_frames: int, detector_name: str):
     print("")
     print(f"  {'='*55}")
-    print(f"  Timing Summary")
+    print(f"  Timing Summary  (detector: {detector_name})")
     print(f"  {'='*55}")
     print(f"  Stage 1 (LLM parsing)  : {timing.get('1_llm', 0):>8.2f}s")
     print(f"  Stage 2 (Sampling)    : {timing.get('2_sampling', 0):>8.2f}s  ({total_frames} frames)")
-    print(f"  Stage 3 (CLIP)        : {timing.get('3_clip', 0):>8.2f}s")
-    print(f"    - model load        : {timing.get('3a_model_load', 0):>8.3f}s")
-    print(f"    - text encode       : {timing.get('3b_text_encode', 0):>8.3f}s")
-    print(f"    - score frames      : {timing.get('3c_score_frames', 0):>8.3f}s")
-    print(f"  Stage 4 (OWLv2)       : {timing.get('4_owlv2', 0):>8.2f}s")
-    print(f"  Stage 5 (Crop+Save)   : {timing.get('5_output', 0):>8.2f}s")
+    dt = timing.get('3_detection', 0)
+    print(f"  Stage 3 (Detection)   : {dt:>8.2f}s")
+    if '3a_model_load' in timing:
+        print(f"    - model load        : {timing['3a_model_load']:>8.3f}s")
+    print(f"  Stage 4 (Crop+Save)   : {timing.get('4_output', 0):>8.2f}s")
     print(f"  {'-'*55}")
     print(f"  TOTAL                 : {timing.get('total', 0):>8.2f}s")
     print(f"  {'='*55}")
+
 
 def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     timing = {}
@@ -124,10 +116,10 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     print(f"[{_ts()}] Pipeline started")
     print(f"  video: {cfg.video_path}")
     print(f"  query: {cfg.query}")
-    print(f"  fps={cfg.fps}, clip_topk={cfg.clip_topk}, max_side={cfg.max_side}")
+    print(f"  fps={cfg.fps}, detector={cfg.detector}, max_side={cfg.max_side}")
 
     # Stage 1: LLM
-    print(f"\n[{_ts()}] [1/5] LLM target extraction ...")
+    print(f"\n[{_ts()}] [1/4] LLM target extraction ...")
     t1 = time.time()
     spec = parse_target_with_llm(
         cfg.query,
@@ -135,15 +127,13 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
         model=cfg.llm_model,
         api_key=cfg.llm_api_key,
     )
-    clip_query = spec.clip_query
     detect_query = spec.detect_query
     t_llm = round(time.time() - t1, 2)
     timing['1_llm'] = t_llm
-    print(f"  -> CLIP query:    {clip_query!r}")
-    print(f"  -> OWLv2 query:   {detect_query!r}  ({t_llm}s)")
+    print(f"  -> detect query: {detect_query!r}  ({t_llm}s)")
 
     # Stage 2: Sampling
-    print(f"\n[{_ts()}] [2/5] Sampling video frames ...")
+    print(f"\n[{_ts()}] [2/4] Sampling video frames ...")
     t2 = time.time()
     frames, sample_meta = sample_frames(
         cfg.video_path,
@@ -153,118 +143,102 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
     )
     t_sampling = round(time.time() - t2, 2)
     timing['2_sampling'] = t_sampling
+
     if not frames:
         print(f"[{_ts()}] [ERROR] No frames could be sampled")
         return {"error": "no_frames", "elapsed_sec": time.time() - start}
     n_frames = len(frames)
     print(f"[{_ts()}] {n_frames} frames sampled ({t_sampling}s)")
 
-    # Stage 3: CLIP
-    print(f"\n[{_ts()}] [3/5] CLIP coarse retrieval on {n_frames} frames ...")
-    t3 = time.time()
-    rgbs_all = [f.rgb for f in frames]
+    # Stage 3: Detection (all frames, with threshold retry)
+    print(f"\n[{_ts()}] [3/4] Detection on {n_frames} frames (detector={cfg.detector}) ...")
+
+    # Determine batch size based on detector
+    if cfg.detector.lower() == "grounding_dino":
+        det_bs = cfg.gdin_batch_size
+    else:
+        det_bs = cfg.det_batch_size
 
     ta = time.time()
-    clip_model = CLIPRetriever(model_name="ViT-B/32")
+    detector = create_detector(cfg.detector, box_threshold=cfg.box_threshold)
     t3a = round(time.time() - ta, 3)
-
-    ta = time.time()
-    text_vec = clip_model.encode_text(clip_query)
-    t3b = round(time.time() - ta, 3)
-
-    ta = time.time()
-    clip_scores = clip_model.score_frames(rgbs_all, text_vec, batch_size=cfg.clip_batch_size)
-    t3c = round(time.time() - ta, 3)
-
-    scored = sorted(zip(frames, clip_scores), key=lambda x: x[1], reverse=True)
-    topk = min(cfg.clip_topk, len(frames))
-    candidate_frames = [f for f, _ in scored[:topk]]
-    top_scores = [round(s, 4) for _, s in scored[:topk]]
-    t_clip = round(time.time() - t3, 2)
-    timing['3_clip'] = t_clip
     timing['3a_model_load'] = t3a
-    timing['3b_text_encode'] = t3b
-    timing['3c_score_frames'] = t3c
-    print(f"[{_ts()}] CLIP top-{topk} scores: {top_scores[:5]}... ({t_clip}s)")
-    del clip_model, text_vec, rgbs_all, scored
+
+    thresholds_to_try = [cfg.box_threshold, 0.15, 0.10, 0.05]
+    candidates: List[Dict[str, Any]] = []
+    det_elapsed = 0.0
+
+    for thresh in thresholds_to_try:
+        # Only recreate detector if threshold changed (first iteration uses existing)
+        if thresh != thresholds_to_try[0]:
+            print(f"\n  [{_ts()}] Retrying with threshold={thresh} ...")
+        candidates, stage_elapsed = _run_detector_stage(
+            frames, detect_query, detector,
+            box_threshold=thresh,
+            batch_size=det_bs,
+        )
+        det_elapsed += stage_elapsed
+        print(f"[{_ts()}] {cfg.detector}: {len(candidates)} detections ({stage_elapsed:.1f}s)")
+        if candidates:
+            break
+
+    t_detection = round(det_elapsed, 2)
+    timing['3_detection'] = t_detection
+
+    del detector
     gc.collect()
     torch.cuda.empty_cache()
 
-    # Stage 4: OWLv2 with threshold retry
-    thresholds_to_try = [cfg.box_threshold, 0.15, 0.10, 0.05]
-    candidates: List[Dict[str, Any]] = []
-    owl_elapsed = 0.0
-
-    for thresh in thresholds_to_try:
-        print(f"\n[{_ts()}] [4/5] OWLv2 grounding (threshold={thresh}) ...")
-        candidates, owl_elapsed = _run_owlv2_stage(
-            candidate_frames, detect_query,
-            box_threshold=thresh,
-            text_threshold=cfg.text_threshold,
-            owl_batch_size=cfg.owl_batch_size,
-        )
-        print(f"[{_ts()}] OWLv2: {len(candidates)} detections ({owl_elapsed:.1f}s)")
-        if candidates:
-            break
-    t_owlv2 = round(owl_elapsed, 2)
-    timing['4_owlv2'] = t_owlv2
-
-    # Stage 5: Output
+    # Stage 4: Output
     if not candidates:
-        timing['5_output'] = 0.0
+        timing['4_output'] = 0.0
         t_total = round(time.time() - start, 2)
         timing['total'] = t_total
-        _print_timing(timing, n_frames)
-        print(f"\n[{_ts()}] [5/5] No target detected after all thresholds")
-        print(f"  CLIP top scores: {top_scores[:10]}")
-        print(f"  CLIP query:    {clip_query!r}")
-        print(f"  OWLv2 query:   {detect_query!r}")
+        _print_timing(timing, n_frames, cfg.detector)
+        print(f"\n[{_ts()}] [4/4] No target detected after all thresholds")
+        print(f"  detect query:  {detect_query!r}")
         print(f"  Tried thresholds: {thresholds_to_try}")
+        print(f"  Detector: {cfg.detector}")
         print(f"  === EXIT (no result) === ({t_total}s)")
         return {
             "video": cfg.video_path,
             "query": cfg.query,
-            "clip_query": clip_query,
             "detect_query": detect_query,
             "error": "no_detection",
-            "clip_top_scores": top_scores,
             "tried_thresholds": thresholds_to_try,
+            "detector": cfg.detector,
             "sampling": sample_meta,
             "elapsed_sec": t_total,
             "timing": timing,
         }
 
-    t5 = time.time()
-    print(f"\n[{_ts()}] [5/5] Selecting best target crop ...")
+    t4 = time.time()
+    print(f"\n[{_ts()}] [4/4] Selecting best target crop ...")
     best = max(candidates, key=lambda c: c["quality_score"])
     best_frame: FrameSample = best["frame_sample"]
     crop_rgb = crop_with_padding(best_frame.rgb, best["bbox"], cfg.crop_padding_ratio)
-    t_output = round(time.time() - t5, 2)
-    timing['5_output'] = t_output
+    t_output = round(time.time() - t4, 2)
+    timing['4_output'] = t_output
 
     t_total = round(time.time() - start, 2)
     timing['total'] = t_total
-    _print_timing(timing, n_frames)
+    _print_timing(timing, n_frames, cfg.detector)
 
     meta = {
         "video": cfg.video_path,
         "query": cfg.query,
-        "clip_query": clip_query,
         "detect_query": detect_query,
         "crop_prompt": spec.crop_prompt,
         "best_timestamp_sec": best["timestamp_sec"],
         "bbox": best["bbox"],
         "confidence": best["confidence"],
         "quality_score": best["quality_score"],
-        "sharpness": best["sharpness"],
-        "clip_top_scores": top_scores,
         "sampling": sample_meta,
         "candidate_count": len(candidates),
         "models": {
             "llm": cfg.llm_model or "deepseek-v4-flash",
-            "coarse_retriever": "CLIP-ViT-B/32",
-            "localizer": "google/owlv2-base-patch16-ensemble",
-            "scorer": "heuristic",
+            "detector": cfg.detector,
+            "scorer": "confidence_only",
         },
         "elapsed_sec": t_total,
         "timing": timing,
@@ -275,10 +249,9 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
 
     print(f"\n[{_ts()}] ===== DONE ({t_total}s) =====")
     print(f"  detect_query : {detect_query}")
-    print(f"  clip_query   : {clip_query}")
+    print(f"  detector     : {cfg.detector}")
     print(f"  timestamp    : {meta['best_timestamp_sec']:.2f}s")
     print(f"  confidence   : {meta['confidence']:.3f}")
-    print(f"  quality      : {meta['quality_score']:.3f}")
     print(f"  crop         : {paths['target_crop']}")
     print(f"  meta         : {paths['meta_json']}")
     return meta
