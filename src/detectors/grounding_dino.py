@@ -21,6 +21,7 @@ except Exception:
 class GroundingDINOConfig:
     model_id: str = "IDEA-Research/grounding-dino-base"
     box_threshold: float = 0.25
+    text_threshold: float = 0.25
 
 
 class GroundingDINODetector(BaseDetector):
@@ -28,9 +29,10 @@ class GroundingDINODetector(BaseDetector):
         if AutoProcessor is None or AutoModelForZeroShotObjectDetection is None:
             raise ImportError("transformers>=4.38 with Grounding DINO support is required")
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.processor = AutoProcessor.from_pretrained(cfg.model_id)
-        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(cfg.model_id).to(self.device).eval()
+        self.processor = AutoProcessor.from_pretrained(cfg.model_id, trust_remote_code=True)
+        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(cfg.model_id, trust_remote_code=True).to(self.device).eval()
         self.box_threshold = cfg.box_threshold
+        self.text_threshold = cfg.text_threshold
 
     @torch.no_grad()
     def detect(self, rgb: np.ndarray, query: str) -> List[Detection]:
@@ -54,6 +56,7 @@ class GroundingDINODetector(BaseDetector):
         results = self.processor.post_process_grounded_object_detection(
             outputs=outputs,
             threshold=self.box_threshold,
+            text_threshold=self.text_threshold,
             target_sizes=target_sizes,
         )
 

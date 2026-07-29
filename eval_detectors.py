@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -21,8 +22,30 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from src.detectors import create_detector
+from src.detectors import create_detector, create_detector_with_text_threshold
 from src.detection import Detection
+
+
+# ---- prompt normalization ----
+
+def normalize_expression_to_query(expression: str) -> str:
+    """Convert a verbose referring expression to a short detection-friendly prompt.
+
+    Grounding models (and even OWL) perform better on compact noun phrases
+    than on long, positional sentences.
+    """
+    t = expression.strip().rstrip(".")
+    # drop leading articles
+    t = re.sub(r"^(a|an|the)\s+", "", t, flags=re.I).strip()
+    # cut at common verb phrase starts
+    m = re.search(r"\b(is|are|was|were|sits|sitting|standing|walking|carrying|showing|drinking|goes|goes in to)\b", t, flags=re.I)
+    if m and m.start() > 0:
+        t = t[:m.start()].strip()
+    # drop trailing prepositional phrases
+    t = re.sub(r"\b(in|on|at|from|with|of|near|behind|towards|another|around)\b.*$", "", t, flags=re.I).strip()
+    if not t:
+        t = " ".join(expression.strip().rstrip(".").split()[:3])
+    return t.strip().rstrip(".") + " ."
 
 
 # ---- data loading ----
@@ -80,7 +103,7 @@ def build_samples(meta: Dict, expressions: Dict, max_videos: int) -> List[Dict]:
             continue
         n_per_obj = n_exprs // n_objects
 
-        # All objects share the same annotated frame list — pick the first frame
+        # All objects share the same annotated frame list -- pick the first frame
         first_obj_frames = list(obj_data.values())[0]["frames"]
         if not first_obj_frames:
             continue
@@ -153,7 +176,12 @@ def main():
 
     print("Loading Grounding DINO ...")
     t0 = time.time()
-    det_dino = create_detector("grounding_dino", box_threshold=args.box_threshold, device=args.device)
+    det_dino = create_detector_with_text_threshold(
+        "grounding_dino",
+        box_threshold=args.box_threshold,
+        text_threshold=max(0.05, args.box_threshold * 0.5),
+        device=args.device,
+    )
     print(f"  loaded in {time.time() - t0:.1f}s")
 
     # ---- evaluate ----
@@ -171,14 +199,19 @@ def main():
         if gt_bbox is None:
             continue
 
-        owl_iou, owl_conf, owl_bbox = run_one(det_owl, frame_path, expr, gt_bbox, "OWLv2")
-        dino_iou, dino_conf, dino_bbox = run_one(det_dino, frame_path, expr, gt_bbox, "DINO")
+        owl_query = normalize_expression_to_query(expr)
+        owl_iou, owl_conf, owl_bbox = run_one(det_owl, frame_path, owl_query, gt_bbox, "OWLv2")
+
+        dino_query = normalize_expression_to_query(expr)
+        dino_iou, dino_conf, dino_bbox = run_one(det_dino, frame_path, dino_query, gt_bbox, "DINO")
 
         results.append({
             "video": vid,
             "object": obj_id,
             "frame": frame_name,
             "expression": expr,
+            "owl_query": owl_query,
+            "dino_query": dino_query,
             "owl_iou": owl_iou,
             "owl_conf": owl_conf,
             "owl_bbox": owl_bbox,

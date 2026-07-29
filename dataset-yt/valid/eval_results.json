@@ -1,0 +1,464 @@
+{
+  "summary": {
+    "n_videos": 5,
+    "n_samples": 18,
+    "owl_mean_iou": 0.5270395353759988,
+    "dino_mean_iou": 0.0,
+    "owl_recall_05": 0.5,
+    "dino_recall_05": 0.0,
+    "owl_avg_conf": 0.44114842100275886,
+    "dino_avg_conf": 0.0
+  },
+  "details": [
+    {
+      "video": "0062f687f1",
+      "object": 1,
+      "frame": "00000",
+      "expression": "a dog is with its puppies on the cloth",
+      "owl_query": "dog .",
+      "dino_query": "dog .",
+      "owl_iou": 0.9630466400586878,
+      "owl_conf": 0.593690812587738,
+      "owl_bbox": [
+        397.2084045410156,
+        26.762351989746094,
+        1092.6929931640625,
+        713.1702880859375
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        409.0,
+        28.0,
+        1100.0,
+        719.0
+      ]
+    },
+    {
+      "video": "0062f687f1",
+      "object": 1,
+      "frame": "00000",
+      "expression": "a dog with puppies all around",
+      "owl_query": "dog .",
+      "dino_query": "dog .",
+      "owl_iou": 0.9630466400586878,
+      "owl_conf": 0.593690812587738,
+      "owl_bbox": [
+        397.2084045410156,
+        26.762351989746094,
+        1092.6929931640625,
+        713.1702880859375
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        409.0,
+        28.0,
+        1100.0,
+        719.0
+      ]
+    },
+    {
+      "video": "0062f687f1",
+      "object": 2,
+      "frame": "00000",
+      "expression": "a puppy dog on the left drinking milk from its mother",
+      "owl_query": "puppy dog .",
+      "dino_query": "puppy dog .",
+      "owl_iou": 0.9256275688800145,
+      "owl_conf": 0.3422856032848358,
+      "owl_bbox": [
+        215.26649475097656,
+        267.2607116699219,
+        457.5784912109375,
+        467.19927978515625
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        207.0,
+        267.0,
+        450.0,
+        465.0
+      ]
+    },
+    {
+      "video": "0062f687f1",
+      "object": 2,
+      "frame": "00000",
+      "expression": "a white puppy near the rear end of an adult dog",
+      "owl_query": "white puppy .",
+      "dino_query": "white puppy .",
+      "owl_iou": 0.0,
+      "owl_conf": 0.4288988709449768,
+      "owl_bbox": [
+        676.9368896484375,
+        293.8449401855469,
+        817.3473510742188,
+        462.03997802734375
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        207.0,
+        267.0,
+        450.0,
+        465.0
+      ]
+    },
+    {
+      "video": "0062f687f1",
+      "object": 3,
+      "frame": "00000",
+      "expression": "a puppy dog in front of dog s mouth goes in to the dog",
+      "owl_query": "puppy dog .",
+      "dino_query": "puppy dog .",
+      "owl_iou": 0.0,
+      "owl_conf": 0.3422856032848358,
+      "owl_bbox": [
+        215.26649475097656,
+        267.2607116699219,
+        457.5784912109375,
+        467.19927978515625
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        757.0,
+        527.0,
+        1067.0,
+        686.0
+      ]
+    },
+    {
+      "video": "0062f687f1",
+      "object": 3,
+      "frame": "00000",
+      "expression": "a dark colored puppy near the adult dog s head",
+      "owl_query": "dark colored puppy .",
+      "dino_query": "dark colored puppy .",
+      "owl_iou": 0.12175288806345959,
+      "owl_conf": 0.4024430513381958,
+      "owl_bbox": [
+        533.8258056640625,
+        444.3046569824219,
+        878.5966796875,
+        627.3180541992188
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        757.0,
+        527.0,
+        1067.0,
+        686.0
+      ]
+    },
+    {
+      "video": "00f88c4f0a",
+      "object": 1,
+      "frame": "00010",
+      "expression": "a person is showing his skate board skills on the road",
+      "owl_query": "person .",
+      "dino_query": "person .",
+      "owl_iou": 0.9521874171482299,
+      "owl_conf": 0.21058982610702515,
+      "owl_bbox": [
+        -0.5824089050292969,
+        223.36624145507812,
+        202.9165496826172,
+        567.7308349609375
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        0.0,
+        222.0,
+        202.0,
+        555.0
+      ]
+    },
+    {
+      "video": "00f88c4f0a",
+      "object": 1,
+      "frame": "00010",
+      "expression": "a person skateboarding on the sidewalk",
+      "owl_query": "person skateboarding .",
+      "dino_query": "person skateboarding .",
+      "owl_iou": 0.9521874171482299,
+      "owl_conf": 0.13386456668376923,
+      "owl_bbox": [
+        -0.5824089050292969,
+        223.36624145507812,
+        202.9165496826172,
+        567.7308349609375
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        0.0,
+        222.0,
+        202.0,
+        555.0
+      ]
+    },
+    {
+      "video": "01057faacf",
+      "object": 1,
+      "frame": "00000",
+      "expression": "a chameleon is standing on the leaf of a plant",
+      "owl_query": "chameleon .",
+      "dino_query": "chameleon .",
+      "owl_iou": 0.4113241951911506,
+      "owl_conf": 0.3527248501777649,
+      "owl_bbox": [
+        215.06756591796875,
+        144.79151916503906,
+        453.0923156738281,
+        306.62603759765625
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        0.0,
+        145.0,
+        456.0,
+        350.0
+      ]
+    },
+    {
+      "video": "01057faacf",
+      "object": 1,
+      "frame": "00000",
+      "expression": "a chameleon walking on the leaves of a plant",
+      "owl_query": "chameleon .",
+      "dino_query": "chameleon .",
+      "owl_iou": 0.4113241951911506,
+      "owl_conf": 0.3527248501777649,
+      "owl_bbox": [
+        215.06756591796875,
+        144.79151916503906,
+        453.0923156738281,
+        306.62603759765625
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        0.0,
+        145.0,
+        456.0,
+        350.0
+      ]
+    },
+    {
+      "video": "01c88b5b60",
+      "object": 1,
+      "frame": "00000",
+      "expression": "a earless seal in the left is sitting with another",
+      "owl_query": "earless seal .",
+      "dino_query": "earless seal .",
+      "owl_iou": 0.798817328686475,
+      "owl_conf": 0.3999527394771576,
+      "owl_bbox": [
+        36.3359260559082,
+        101.80229187011719,
+        505.7115173339844,
+        629.6362915039062
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        25.0,
+        94.0,
+        592.0,
+        641.0
+      ]
+    },
+    {
+      "video": "01c88b5b60",
+      "object": 1,
+      "frame": "00000",
+      "expression": "an earless seal on the left of another",
+      "owl_query": "earless seal .",
+      "dino_query": "earless seal .",
+      "owl_iou": 0.798817328686475,
+      "owl_conf": 0.3999527394771576,
+      "owl_bbox": [
+        36.3359260559082,
+        101.80229187011719,
+        505.7115173339844,
+        629.6362915039062
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        25.0,
+        94.0,
+        592.0,
+        641.0
+      ]
+    },
+    {
+      "video": "01c88b5b60",
+      "object": 2,
+      "frame": "00000",
+      "expression": "a baby earless seal in the right is sitting with another",
+      "owl_query": "baby earless seal .",
+      "dino_query": "baby earless seal .",
+      "owl_iou": 0.10690767168285802,
+      "owl_conf": 0.2842358946800232,
+      "owl_bbox": [
+        36.3359260559082,
+        101.80229187011719,
+        505.7115173339844,
+        629.6362915039062
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        341.0,
+        344.0,
+        1062.0,
+        676.0
+      ]
+    },
+    {
+      "video": "01c88b5b60",
+      "object": 2,
+      "frame": "00000",
+      "expression": "an earless seal on the right of another",
+      "owl_query": "earless seal .",
+      "dino_query": "earless seal .",
+      "owl_iou": 0.10690767168285802,
+      "owl_conf": 0.3999527394771576,
+      "owl_bbox": [
+        36.3359260559082,
+        101.80229187011719,
+        505.7115173339844,
+        629.6362915039062
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        341.0,
+        344.0,
+        1062.0,
+        676.0
+      ]
+    },
+    {
+      "video": "01c88b5b60",
+      "object": 3,
+      "frame": "00000",
+      "expression": "a earless seal is sitting far behind the two seals",
+      "owl_query": "earless seal .",
+      "dino_query": "earless seal .",
+      "owl_iou": 0.04279272445024904,
+      "owl_conf": 0.3999527394771576,
+      "owl_bbox": [
+        36.3359260559082,
+        101.80229187011719,
+        505.7115173339844,
+        629.6362915039062
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        46.0,
+        306.0,
+        139.0,
+        420.0
+      ]
+    },
+    {
+      "video": "01c88b5b60",
+      "object": 3,
+      "frame": "00000",
+      "expression": "a seal on the extreme left end of two others",
+      "owl_query": "seal .",
+      "dino_query": "seal .",
+      "owl_iou": 0.04279272445024904,
+      "owl_conf": 0.4805147349834442,
+      "owl_bbox": [
+        36.3359260559082,
+        101.80229187011719,
+        505.7115173339844,
+        629.6362915039062
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        46.0,
+        306.0,
+        139.0,
+        420.0
+      ]
+    },
+    {
+      "video": "03664dc880",
+      "object": 1,
+      "frame": "00000",
+      "expression": "a giraffe is walking on the grass field from the left",
+      "owl_query": "giraffe .",
+      "dino_query": "giraffe .",
+      "owl_iou": 0.944589612694602,
+      "owl_conf": 0.9114555716514587,
+      "owl_bbox": [
+        193.94619750976562,
+        55.34942626953125,
+        850.3394775390625,
+        726.1011352539062
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        208.0,
+        62.0,
+        841.0,
+        719.0
+      ]
+    },
+    {
+      "video": "03664dc880",
+      "object": 1,
+      "frame": "00000",
+      "expression": "a giraffe walking rightwards towards another on the right of the view",
+      "owl_query": "giraffe .",
+      "dino_query": "giraffe .",
+      "owl_iou": 0.944589612694602,
+      "owl_conf": 0.9114555716514587,
+      "owl_bbox": [
+        193.94619750976562,
+        55.34942626953125,
+        850.3394775390625,
+        726.1011352539062
+      ],
+      "dino_iou": 0.0,
+      "dino_conf": 0.0,
+      "dino_bbox": null,
+      "gt_bbox": [
+        208.0,
+        62.0,
+        841.0,
+        719.0
+      ]
+    }
+  ]
+}

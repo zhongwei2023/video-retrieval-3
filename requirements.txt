@@ -7,7 +7,7 @@ Pillow
 pyyaml
 transformers>=4.43.0
 openai>=1.40.0
-git+https://github.com/openai/CLIP.git
+
 ftfy
 regex
 tqdm
